@@ -284,7 +284,8 @@ export class AccountPool {
         success: log.success,
         errorMessage: log.errorMessage,
         apiKey: log.apiKey,
-        stream: log.stream
+        stream: log.stream,
+        downstreamModel: log.downstreamModel
       });
     }
   }

@@ -163,15 +163,20 @@ export class DatabaseManager {
     if (!this._columnExists('request_logs', 'stream')) {
       this.db.exec(`ALTER TABLE request_logs ADD COLUMN stream INTEGER`);
     }
+
+    // 为 request_logs 表添加 downstream_model 字段
+    if (!this._columnExists('request_logs', 'downstream_model')) {
+      this.db.exec(`ALTER TABLE request_logs ADD COLUMN downstream_model TEXT`);
+    }
   }
 
   // 插入请求日志
   insertLog(log) {
     const stmt = this.db.prepare(`
       INSERT INTO request_logs (
-        timestamp, account_id, account_name, model, 
-        input_tokens, output_tokens, duration_ms, success, error_message, api_key, stream
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        timestamp, account_id, account_name, model,
+        input_tokens, output_tokens, duration_ms, success, error_message, api_key, stream, downstream_model
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -185,19 +190,21 @@ export class DatabaseManager {
       log.success ? 1 : 0,
       log.errorMessage || null,
       log.apiKey || null,
-      log.stream !== undefined ? (log.stream ? 1 : 0) : null
+      log.stream !== undefined ? (log.stream ? 1 : 0) : null,
+      log.downstreamModel || null
     );
   }
 
   // 获取最近的日志（分页）
   getRecentLogs(limit = 100, offset = 0) {
     const stmt = this.db.prepare(`
-      SELECT 
+      SELECT
         rl.id,
         rl.timestamp,
         rl.account_id as accountId,
         rl.account_name as accountName,
         rl.model,
+        rl.downstream_model as downstreamModel,
         rl.input_tokens as inputTokens,
         rl.output_tokens as outputTokens,
         rl.duration_ms as durationMs,

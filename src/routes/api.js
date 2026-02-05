@@ -91,6 +91,7 @@ export function createApiRouter(state) {
   router.post('/messages', async (req, res) => {
     const startTime = Date.now();
     let selected = null;
+    let downstreamModel = null;
 
     try {
       // 选择账号
@@ -104,16 +105,17 @@ export function createApiRouter(state) {
 
       const isStream = req.body.stream === true;
       const kiroClient = new KiroClient(state.config, selected.tokenManager);
+      downstreamModel = kiroClient.mapModel(req.body.model);
 
       // 调用 Kiro API
       const { response, toolNameMap } = await kiroClient.callApiStream(req.body);
 
       if (isStream) {
         // 流式响应
-        await handleStreamResponse(res, response, toolNameMap, selected, state, startTime, req.body.model, req);
+        await handleStreamResponse(res, response, toolNameMap, selected, state, startTime, req.body.model, req, downstreamModel);
       } else {
         // 非流式响应
-        await handleNonStreamResponse(res, response, toolNameMap, selected, state, startTime, req.body.model, req);
+        await handleNonStreamResponse(res, response, toolNameMap, selected, state, startTime, req.body.model, req, downstreamModel);
       }
 
     } catch (error) {
@@ -129,7 +131,8 @@ export function createApiRouter(state) {
           success: false,
           error: error.message,
           apiKey: req.apiKey,
-          stream: req.body.stream === true
+          stream: req.body.stream === true,
+          downstreamModel: downstreamModel
         });
         
         // 增加账号错误计数
@@ -199,7 +202,7 @@ function inferAnthropicErrorType(status) {
 /**
  * 处理流式响应 (Anthropic 格式)
  */
-async function handleStreamResponse(res, response, toolNameMap, selected, state, startTime, model, req) {
+async function handleStreamResponse(res, response, toolNameMap, selected, state, startTime, model, req, downstreamModel) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -529,7 +532,8 @@ async function handleStreamResponse(res, response, toolNameMap, selected, state,
       durationMs: Date.now() - startTime,
       success: true,
       apiKey: req.apiKey,
-      stream: true
+      stream: true,
+      downstreamModel: downstreamModel
     });
 
   } catch (error) {
@@ -544,7 +548,8 @@ async function handleStreamResponse(res, response, toolNameMap, selected, state,
       success: false,
       errorMessage: error.message,
       apiKey: req.apiKey,
-      stream: true
+      stream: true,
+      downstreamModel: downstreamModel
     });
     res.end();
   }
@@ -553,7 +558,7 @@ async function handleStreamResponse(res, response, toolNameMap, selected, state,
 /**
  * 处理非流式响应 (Anthropic 格式)
  */
-async function handleNonStreamResponse(res, response, toolNameMap, selected, state, startTime, model, req) {
+async function handleNonStreamResponse(res, response, toolNameMap, selected, state, startTime, model, req, downstreamModel) {
   const decoder = new EventStreamDecoder();
   let textContent = '';
   let thinkingContent = '';
@@ -676,7 +681,8 @@ async function handleNonStreamResponse(res, response, toolNameMap, selected, sta
       durationMs: Date.now() - startTime,
       success: true,
       apiKey: req.apiKey,
-      stream: false
+      stream: false,
+      downstreamModel: downstreamModel
     });
 
   } catch (error) {
@@ -691,7 +697,8 @@ async function handleNonStreamResponse(res, response, toolNameMap, selected, sta
       success: false,
       errorMessage: error.message,
       apiKey: req.apiKey,
-      stream: false
+      stream: false,
+      downstreamModel: downstreamModel
     });
     throw error;
   }
